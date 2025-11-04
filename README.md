@@ -30,6 +30,7 @@ For more granular control, you can use any of the following standalone tools:
 - **YouTube Chapter Generator:** Automatically propose timestamped chapters from a video transcript.
 - **YouTube Name Generator:** Get ideas for unique and catchy channel names.
 - **YT Thumbnail Copier:** Reconstruct a reference thumbnail with high precision and apply only your requested changes.
+- **X Video Downloader:** Enter an X (Twitter) post URL to download the embedded video.
 
 ## 🚀 Technology Stack
 

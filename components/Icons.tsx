@@ -205,6 +205,16 @@ export const BriefcaseIcon: React.FC<{ className?: string }> = ({ className }) =
     </svg>
 );
 
+export const ChatbotIcon: React.FC<{ className?: string }> = ({ className }) => (
+  <svg className={className} viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" strokeWidth="1.5">
+    <path d="M7.5 13.4375C8.5 14.4375 10 14.9375 12 14.9375C14 14.9375 15.5 14.4375 16.5 13.4375" stroke="currentColor" strokeLinecap="round"/>
+    <path d="M15 10.4375C15 10.7136 14.7761 10.9375 14.5 10.9375C14.2239 10.9375 14 10.7136 14 10.4375C14 10.1614 14.2239 9.9375 14.5 9.9375C14.7761 9.9375 15 10.1614 15 10.4375Z" fill="currentColor"/>
+    <path d="M12.5 10.4375C12.5 10.7136 12.2761 10.9375 12 10.9375C11.7239 10.9375 11.5 10.7136 11.5 10.4375C11.5 10.1614 11.7239 9.9375 12 9.9375C12.2761 9.9375 12.5 10.1614 12.5 10.4375Z" fill="currentColor"/>
+    <path d="M10 10.4375C10 10.7136 9.77614 10.9375 9.5 10.9375C9.22386 10.9375 9 10.7136 9 10.4375C9 10.1614 9.22386 9.9375 9.5 9.9375C9.77614 9.9375 10 10.1614 10 10.4375Z" fill="currentColor"/>
+  </svg>
+);
+
+
 export const ChatBubbleLeftEllipsisIcon: React.FC<{ className?: string }> = ({ className }) => (
     <svg xmlns="http://www.w3.org/2000/svg" className={className} fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
         <path strokeLinecap="round" strokeLinejoin="round" d="M8.625 12a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0Zm0 0H8.25m4.125 0a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0Zm0 0H12m4.125 0a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0Zm0 0h-.375M21 12c0 4.556-4.03 8.25-9 8.25a9.76 9.76 0 0 1-2.53-.375l-4.097 1.29a.75.75 0 0 1-.94- .94l1.29-4.097A9.76 9.76 0 0 1 3 12c0-4.556 4.03-8.25 9-8.25s9 3.694 9 8.25Z" />
@@ -214,5 +224,49 @@ export const ChatBubbleLeftEllipsisIcon: React.FC<{ className?: string }> = ({ c
 export const PaperAirplaneIcon: React.FC<{ className?: string }> = ({ className }) => (
     <svg xmlns="http://www.w3.org/2000/svg" className={className} fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
         <path strokeLinecap="round" strokeLinejoin="round" d="M6 12 3.269 3.125A59.769 59.769 0 0 1 21.485 12 59.768 59.768 0 0 1 3.27 20.875L5.999 12Zm0 0h7.5" />
+    </svg>
+);
+
+export const ShortsInfoIcon: React.FC<{ className?: string }> = ({ className }) => (
+    <svg xmlns="http://www.w3.org/2000/svg" className={className} fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+        <path strokeLinecap="round" strokeLinejoin="round" d="M10.5 1.5H8.25A2.25 2.25 0 0 0 6 3.75v16.5a2.25 2.25 0 0 0 2.25 2.25h7.5A2.25 2.25 0 0 0 18 20.25V3.75a2.25 2.25 0 0 0-2.25-2.25H13.5m-3 0V3h3V1.5m-3 0h3m-3 18h3" />
+        <path strokeLinecap="round" strokeLinejoin="round" d="M9 8.25h6m-6 3h3" />
+    </svg>
+);
+
+export const ShortsMagicIcon: React.FC<{ className?: string }> = ({ className }) => (
+    <svg xmlns="http://www.w3.org/2000/svg" className={className} fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+        <path strokeLinecap="round" strokeLinejoin="round" d="M10.5 1.5H8.25A2.25 2.25 0 0 0 6 3.75v16.5a2.25 2.25 0 0 0 2.25 2.25h7.5A2.25 2.25 0 0 0 18 20.25V3.75a2.25 2.25 0 0 0-2.25-2.25H13.5m-3 0V3h3V1.5m-3 0h3m-3 18h3" />
+        <path strokeLinecap="round" strokeLinejoin="round" d="m14.25 9-1.5-1.5-1.5 1.5m2.06 2.06-2.06 2.06-2.06-2.06" />
+        <path strokeLinecap="round" strokeLinejoin="round" d="M9.813 15.904 9 18.75l-.813-2.846a4.5 4.5 0 0 0-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 0 0 3.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 0 0 3.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 0 0-3.09 3.09Z" />
+    </svg>
+);
+
+export const XPostIcon: React.FC<{ className?: string }> = ({ className }) => (
+    <svg xmlns="http://www.w3.org/2000/svg" className={className} fill="none" viewBox="0 0 24 24">
+        <g clipPath="url(#clip0_x_post)">
+            <path d="M16.14 1.424H18.9L12.553 8.752L20 18.576H14.28L10.972 13.912L7.028 18.576H4.276L11.04 10.744L4.5 1.424H10.38L13.316 5.56L16.14 1.424ZM15.42 16.824H16.98L7.484 2.976H5.828L15.42 16.824Z" fill="currentColor"/>
+            <path d="M19.5 4.5l.5 1.75.5-1.75.5 1.75 1.75.5-1.75.5-1.75.5 1.75.5-1.75.5-.5 1.75-.5-1.75-1.75-.5 1.75-.5-1.75-.5 1.75-.5z" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+        </g>
+        <defs>
+            <clipPath id="clip0_x_post">
+                <rect width="24" height="24" fill="white"/>
+            </clipPath>
+        </defs>
+    </svg>
+);
+
+export const XReplyIcon: React.FC<{ className?: string }> = ({ className }) => (
+    <svg xmlns="http://www.w3.org/2000/svg" className={className} fill="none" viewBox="0 0 24 24">
+        <path d="M14.982 5.516H17.077L12.197 11.196L18 18.5H13.83L10.89 14.29L7.355 18.5H5.32L10.44 12.4L4.5 5.516H8.72L11.303 9.356L14.982 5.516ZM14.268 16.596H15.434L7.14 7.02H6.014L14.268 16.596Z" fill="currentColor"/>
+        <path d="M9 4H5.5C4.94772 4 4.5 4.44772 4.5 5V9C4.5 9.55228 4.94772 10 5.5 10H6.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+        <path d="M7 7L4 10L7 13" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+    </svg>
+);
+
+export const XVideoDownloadIcon: React.FC<{ className?: string }> = ({ className }) => (
+    <svg xmlns="http://www.w3.org/2000/svg" className={className} fill="none" viewBox="0 0 24 24">
+        <path d="M13.498 1.5H16.273L10.126 8.718L17.75 18.5H12.11L8.874 13.92L5.021 18.5H2.246L8.803 10.668L1.5 1.5H7.308L10.183 5.51L13.498 1.5ZM12.79 16.83H14.32L4.996 2.98H3.36L12.79 16.83Z" fill="currentColor"/>
+        <path d="M18 9L18 15M18 15L20 13M18 15L16 13" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
     </svg>
 );

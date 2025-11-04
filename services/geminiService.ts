@@ -1,5 +1,5 @@
 import { GoogleGenAI, Modality, Type, GenerateContentResponse } from "@google/genai";
-import { TitleGenerationResponse, DescriptionGenerationResponse, ScriptGenerationResponse, ShortsGenerationResponse } from '../types';
+import { TitleGenerationResponse, DescriptionGenerationResponse, ScriptGenerationResponse, ShortsGenerationResponse, ShortsTitleDescResponse, XReplyGenerationResponse } from '../types';
 
 // Ensure the API key is available from environment variables
 if (!process.env.API_KEY) {
@@ -727,8 +727,6 @@ export const runFullWorkflow = async (
 export const generateFinancialThread = async (companyName: string): Promise<string[]> => {
     const systemPrompt = `You are a senior equity analyst and expert social media copywriter, specializing in clear, data-driven, and engaging financial commentary for an audience on X (formerly Twitter), with a focus on Indian markets.
 
-Your task is to generate a 12-post thread analyzing a publicly traded company.
-
 **HARD RULES:**
 1.  **DATA SOURCE:** You MUST use Google Search to find the latest, most relevant data. For Indian companies, you MUST prioritize data from \`screener.in\`. Mentioning this source adds credibility.
 2.  **ACCURACY:** All financial data (revenue, profit, ratios, etc.) must be accurate and recent.
@@ -779,4 +777,179 @@ Do not include any other text, preamble, or markdown formatting around the JSON 
         throw new Error("Could not generate the financial thread. The response was not in the expected format.");
     }
     return thread;
+};
+
+// --- New X (Twitter) Tools ---
+
+export const getXVideoDownloadLink = async (tweetUrl: string): Promise<string> => {
+    const prompt = `
+You are a specialized API calling agent. Your task is to find a downloadable MP4 link for a video embedded in an X (formerly Twitter) post.
+
+The user has provided this X post URL: "${tweetUrl}"
+
+**Workflow:**
+1.  Use Google Search to find a free, public API service that can download Twitter videos. A good example is a service like "ssstwitter.com" or "twittervideodownloader.com", which often have underlying APIs.
+2.  Formulate a POST request to one of these services' API endpoints. The request body usually contains the tweet URL. For example, for a service like 'savetweetvid', the request might look like a POST to an endpoint with a body like \`{ "url": "${tweetUrl}" }\`.
+3.  Analyze the JSON response from the API. The response typically contains an array of video formats with different qualities.
+4.  Identify the object representing the highest quality MP4 video. It usually has a "quality" field like "HD" or "720p" and a "url" or "link" field.
+5.  Extract the URL from that object.
+
+**CRITICAL OUTPUT:**
+- Return ONLY the final, direct MP4 video URL as a plain string.
+- Do NOT include any other text, greetings, explanations, or markdown formatting.
+- The URL must be a direct link to a video file (ending in .mp4 or with query parameters that point to a video).
+
+**ERROR HANDLING:**
+- If you cannot find a working API, cannot parse the response, or if the post does not contain a video, you MUST return the exact string: "Could not find a downloadable video for this post."
+    `;
+
+    const response = await ai.models.generateContent({
+        model: 'gemini-2.5-pro', // Pro is better for multi-step reasoning like this
+        contents: prompt,
+        config: {
+            tools: [{ googleSearch: {} }],
+        },
+    });
+
+    const videoLink = response.text.trim();
+
+    if (videoLink.startsWith('http')) {
+        return videoLink;
+    } else {
+        // Throw an error with the model's response for debugging
+        throw new Error(videoLink || "The AI model failed to return a valid video link.");
+    }
+};
+
+export const generateViralXPost = async (topic: string): Promise<string> => {
+    const response = await ai.models.generateContent({
+        model: 'gemini-2.5-flash',
+        contents: `You are an expert X (Twitter) copywriter known for creating viral posts.
+        Your goal is to write a single, highly engaging post based on the following topic: "${topic}".
+
+        **Rules for Virality:**
+        1.  **Strong Hook:** Start with a question, a bold statement, or a surprising fact.
+        2.  **Provide Value:** Offer a key insight, a useful tip, a quick story, or a unique perspective.
+        3.  **Readability:** Use simple language, short sentences, and line breaks to make it easy to scan.
+        4.  **Call to Engagement (CTE):** End with a question that encourages replies (e.g., "What's your take?", "Am I missing anything?").
+        5.  **Hashtags:** Include 1-3 relevant and popular hashtags.
+
+        Return ONLY the text of the post. Do not include any preamble, explanation, or markdown formatting.`,
+    });
+    return response.text.trim();
+};
+
+export const generateXPostReply = async (originalPost: string, tone: string, goal: string): Promise<XReplyGenerationResponse> => {
+    const response = await ai.models.generateContent({
+        model: 'gemini-2.5-pro',
+        contents: `You are an AI assistant specializing in crafting strategic replies on X (Twitter).
+        Your task is to generate 3 distinct reply options for the post below.
+
+        **Original Post:**
+        """
+        ${originalPost}
+        """
+
+        **Your Instructions:**
+        - **Tone:** Your replies must adopt a **${tone}** tone.
+        - **Goal:** Your primary goal with these replies is to **${goal}**.
+
+        **Guidelines:**
+        - Keep replies concise and under 280 characters.
+        - Make sure the replies are directly relevant to the original post.
+        - Do not be generic. Add specific value, a question, or a unique perspective.
+
+        Return the result as a single JSON object with a key "replies" which is an array of 3 strings.
+        Format the entire output inside a \`\`\`json block. Do not include any other text, preamble, or explanation.`,
+        config: {
+            responseMimeType: "application/json",
+            responseSchema: {
+                type: Type.OBJECT,
+                properties: {
+                    replies: {
+                        type: Type.ARRAY,
+                        items: { type: Type.STRING }
+                    }
+                },
+                required: ["replies"]
+            }
+        },
+    });
+
+    const result = parseJsonFromText<XReplyGenerationResponse>(response.text);
+    if (!result || !Array.isArray(result.replies)) {
+        throw new Error("Could not generate X replies. The response was not in the expected format.");
+    }
+    return result;
+};
+
+
+// --- New Shorts Tools ---
+
+export const generateShortsTitleAndDescFromVideo = async (base64VideoData: string, mimeType: string): Promise<ShortsTitleDescResponse> => {
+    const prompt = `You are a YouTube Shorts expert specializing in viral content. Analyze the provided short video and generate a viral title, a short SEO-friendly description, and 5 relevant hashtags.
+
+    **Rules:**
+    - **Title:** Must be under 70 characters. It should be catchy, create curiosity, or clearly state the video's value.
+    - **Description:** Must be under 150 characters. It should summarize the video and encourage engagement.
+    - **Hashtags:** Provide 5 relevant hashtags, always including #shorts.
+    
+    Return the response as a single JSON object with the keys "title", "description", and "hashtags" (an array of strings). Do not include any other text or markdown formatting.`;
+
+    const response = await ai.models.generateContent({
+        model: 'gemini-2.5-pro',
+        contents: {
+            parts: [
+                {
+                    inlineData: {
+                        data: base64VideoData,
+                        mimeType: mimeType,
+                    },
+                },
+                { text: prompt },
+            ],
+        },
+        config: {
+            responseMimeType: 'application/json',
+            responseSchema: {
+                type: Type.OBJECT,
+                properties: {
+                    title: { type: Type.STRING },
+                    description: { type: Type.STRING },
+                    hashtags: {
+                        type: Type.ARRAY,
+                        items: { type: Type.STRING },
+                    },
+                },
+                required: ["title", "description", "hashtags"],
+            },
+        },
+    });
+
+    const result = parseJsonFromText<ShortsTitleDescResponse>(response.text);
+    if (!result || !result.title) {
+        throw new Error("Could not generate title and description from video. The response was not in the expected format.");
+    }
+    return result;
+};
+
+export const startVideoGeneration = async (prompt: string) => {
+    // Re-create instance to ensure the latest API key from the dialog is used.
+    const localAi = new GoogleGenAI({ apiKey: process.env.API_KEY });
+    let operation = await localAi.models.generateVideos({
+        model: 'veo-3.1-fast-generate-preview',
+        prompt: prompt,
+        config: {
+            numberOfVideos: 1,
+            resolution: '720p',
+            aspectRatio: '9:16'
+        }
+    });
+    return operation;
+};
+
+export const checkVideoGenerationStatus = async (operation: any) => {
+    const localAi = new GoogleGenAI({ apiKey: process.env.API_KEY });
+    let updatedOperation = await localAi.operations.getVideosOperation({ operation: operation });
+    return updatedOperation;
 };

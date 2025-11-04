@@ -1,5 +1,5 @@
-import React, { useState, useCallback, useEffect } from 'react';
-import { Tool, TitleGenerationResponse, DescriptionGenerationResponse, ScriptGenerationResponse, TitleOption, ScriptSection, ScriptCTA, ShortsGenerationResponse } from '../types';
+import React, { useState, useCallback, useEffect, useRef } from 'react';
+import { Tool, TitleGenerationResponse, DescriptionGenerationResponse, ScriptGenerationResponse, TitleOption, ScriptSection, ScriptCTA, ShortsGenerationResponse, ShortsTitleDescResponse, XReplyGenerationResponse } from '../types';
 import * as geminiService from '../services/geminiService';
 import { DownloadIcon, SparklesIcon, WriteIcon, CheckCircleIcon, ClockIcon, SpinnerIcon, TargetIcon, ClipboardIcon, ClipboardCheckIcon, XIcon, BriefcaseIcon } from './Icons';
 import { CreationContext } from '../App';
@@ -115,9 +115,13 @@ const ToolView: React.FC<ToolViewProps> = ({ tool, creationContext, setCreationC
   const [transcript, setTranscript] = useState('');
   const [videoID, setVideoID] = useState<string | null>(null);
   
+  // State for X Post Reply Generator
+  const [replyTone, setReplyTone] = useState('Witty');
+  const [replyGoal, setReplyGoal] = useState('Drive Engagement');
+  
   useEffect(() => {
     // For transcript/downloader generator, don't pre-fill with topic
-    if (tool.id === 'transcript-generator' || tool.id === 'thumbnail-downloader') {
+    if (tool.id === 'transcript-generator' || tool.id === 'thumbnail-downloader' || tool.id === 'x-video-downloader') {
       setPrompt('');
     } else {
       setPrompt(creationContext.selectedTitle || creationContext.topic);
@@ -138,13 +142,23 @@ const ToolView: React.FC<ToolViewProps> = ({ tool, creationContext, setCreationC
 
 
   const [imageFile, setImageFile] = useState<File | null>(null);
+  const [videoFile, setVideoFile] = useState<File | null>(null);
   const [originalImageUrl, setOriginalImageUrl] = useState<string | null>(null);
+  const [videoPreviewUrl, setVideoPreviewUrl] = useState<string | null>(null);
   const [generatedContent, setGeneratedContent] = useState<any>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [isEnhancing, setIsEnhancing] = useState(false);
   const [isSummarizing, setIsSummarizing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isDraggingOver, setIsDraggingOver] = useState(false);
+  
+  // State for Veo Video Generator
+  const [hasApiKey, setHasApiKey] = useState(false);
+  const [isCheckingApiKey, setIsCheckingApiKey] = useState(tool.id === 'shorts-video-generator');
+  const [operation, setOperation] = useState<any | null>(null);
+  const [loadingMessage, setLoadingMessage] = useState('');
+  const pollingIntervalRef = useRef<number | null>(null);
+
 
   // State for the YT Thumbnail Copier workflow
   const [copierState, setCopierState] = useState<CopierAssistantState>({
@@ -195,22 +209,28 @@ const ToolView: React.FC<ToolViewProps> = ({ tool, creationContext, setCreationC
 
   const handleFileSelect = (file: File | null) => {
     if (file) {
-      if (!file.type.startsWith('image/')) {
-        setError('Please upload a valid image file (e.g., PNG, JPG).');
-        return;
-      }
-      setImageFile(file);
-      setOriginalImageUrl(URL.createObjectURL(file));
-      setGeneratedContent(null);
-      setError(null);
+      if (file.type.startsWith('image/')) {
+        setImageFile(file);
+        setOriginalImageUrl(URL.createObjectURL(file));
+        setGeneratedContent(null);
+        setError(null);
 
-      if (tool.id === 'copy-assistant') {
-          handleCopierAnalysis(file);
+        if (tool.id === 'copy-assistant') {
+            handleCopierAnalysis(file);
+        }
+      } else if (file.type.startsWith('video/')) {
+        setVideoFile(file);
+        setVideoPreviewUrl(URL.createObjectURL(file));
+        setGeneratedContent(null);
+        setError(null);
+      } else {
+        setError('Please upload a valid image or video file.');
+        return;
       }
     }
   };
 
-  const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
       handleFileSelect(e.target.files[0]);
     }
@@ -243,15 +263,17 @@ const ToolView: React.FC<ToolViewProps> = ({ tool, creationContext, setCreationC
       }
   };
   
-  const clearImage = () => {
+  const clearFile = () => {
     setImageFile(null);
-    if (originalImageUrl) {
-        URL.revokeObjectURL(originalImageUrl);
-    }
+    setVideoFile(null);
+    if (originalImageUrl) URL.revokeObjectURL(originalImageUrl);
+    if (videoPreviewUrl) URL.revokeObjectURL(videoPreviewUrl);
+    
     setOriginalImageUrl(null);
+    setVideoPreviewUrl(null);
     setGeneratedContent(null);
+
     if (tool.id === 'copy-assistant') {
-        // Reset the assistant workflow
         setCopierState({
             step: 'upload', analysisResult: null, userResponses: {}, finalEditPlan: null
         });
@@ -291,10 +313,29 @@ const ToolView: React.FC<ToolViewProps> = ({ tool, creationContext, setCreationC
           setIsSummarizing(false);
       }
   };
+  
+    const cleanupPolling = () => {
+        if (pollingIntervalRef.current) {
+            clearInterval(pollingIntervalRef.current);
+            pollingIntervalRef.current = null;
+        }
+    };
+
+    useEffect(() => {
+        if (tool.id === 'shorts-video-generator') {
+            const checkKey = async () => {
+                const hasKey = await (window as any).aistudio.hasSelectedApiKey();
+                setHasApiKey(hasKey);
+                setIsCheckingApiKey(false);
+            };
+            checkKey();
+        }
+        return cleanupPolling;
+    }, [tool.id]);
 
   const handleSubmit = useCallback(async (e: React.FormEvent) => {
     e.preventDefault();
-    if (tool.id === 'copy-assistant' || tool.id === 'thumbnail-downloader') return;
+    if (['copy-assistant', 'thumbnail-downloader', 'shorts-video-generator'].includes(tool.id)) return;
 
     setIsLoading(true);
     setError(null);
@@ -303,6 +344,14 @@ const ToolView: React.FC<ToolViewProps> = ({ tool, creationContext, setCreationC
     try {
       let result;
       switch (tool.id) {
+        case 'x-video-downloader':
+          if (!prompt) {
+              setError('Please enter an X post URL.');
+              setIsLoading(false);
+              return;
+          }
+          result = await geminiService.getXVideoDownloadLink(prompt);
+          break;
         case 'transcript-generator':
           if (!prompt) {
             setError('Please enter a YouTube video URL.');
@@ -354,6 +403,22 @@ const ToolView: React.FC<ToolViewProps> = ({ tool, creationContext, setCreationC
           }
           result = await geminiService.generateFinancialThread(prompt);
           break;
+        case 'x-viral-post':
+          if (!prompt) {
+             setError('Please enter a topic for the post.');
+             setIsLoading(false);
+             return;
+          }
+          result = await geminiService.generateViralXPost(prompt);
+          break;
+        case 'x-post-reply':
+          if (!prompt) {
+             setError('Please enter the original post content or URL.');
+             setIsLoading(false);
+             return;
+          }
+          result = await geminiService.generateXPostReply(prompt, replyTone, replyGoal);
+          break;
         case 'description-generator':
            if (!transcript && !prompt) {
              setError('Please enter a video transcript or a topic/title.');
@@ -380,20 +445,90 @@ const ToolView: React.FC<ToolViewProps> = ({ tool, creationContext, setCreationC
           }
           result = await geminiService.generateChapters(transcript);
           break;
+        case 'shorts-title-desc-generator':
+            if (!videoFile) {
+                setError('Please upload a short video file.');
+                setIsLoading(false);
+                return;
+            }
+            const base64Video = await fileToBase64(videoFile);
+            result = await geminiService.generateShortsTitleAndDescFromVideo(base64Video, videoFile.type);
+            break;
         default:
           throw new Error('Selected tool not implemented.');
       }
 
       if (result !== undefined) {
           setGeneratedContent(result);
-          onSaveAsProject(prompt || creationContext.topic || 'Untitled Project', tool.id, result);
+          onSaveAsProject(prompt || creationContext.topic || videoFile?.name || 'Untitled Project', tool.id, result);
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'An unexpected error occurred.');
     } finally {
       setIsLoading(false);
     }
-  }, [tool.id, prompt, imageFile, transcript, setCreationContext, onSaveAsProject, creationContext.topic]);
+  }, [tool.id, prompt, imageFile, videoFile, transcript, setCreationContext, onSaveAsProject, creationContext.topic, replyTone, replyGoal]);
+  
+  const handleVideoGenerationSubmit = useCallback(async (e: React.FormEvent) => {
+        e.preventDefault();
+        if (!prompt) {
+            setError('Please enter a prompt to generate the video.');
+            return;
+        }
+
+        setIsLoading(true);
+        setError(null);
+        setGeneratedContent(null);
+        setOperation(null);
+        setLoadingMessage('Initializing video generation...');
+
+        try {
+            const initialOp = await geminiService.startVideoGeneration(prompt);
+            setOperation(initialOp);
+            setLoadingMessage('Video generation started. This process can take several minutes. Please wait...');
+
+            pollingIntervalRef.current = window.setInterval(async () => {
+                try {
+                    setLoadingMessage('Checking progress... Your video is being created.');
+                    const updatedOp = await geminiService.checkVideoGenerationStatus(initialOp);
+                    setOperation(updatedOp);
+
+                    if (updatedOp.done) {
+                        cleanupPolling();
+                        setLoadingMessage('Finalizing video...');
+                        const downloadLink = updatedOp.response?.generatedVideos?.[0]?.video?.uri;
+                        if (downloadLink && process.env.API_KEY) {
+                            const videoResponse = await fetch(`${downloadLink}&key=${process.env.API_KEY}`);
+                            const videoBlob = await videoResponse.blob();
+                            const videoUrl = URL.createObjectURL(videoBlob);
+                            setGeneratedContent(videoUrl);
+                            onSaveAsProject(prompt, tool.id, videoUrl);
+                        } else {
+                            throw new Error('Video generation finished, but no download link was found.');
+                        }
+                        setIsLoading(false);
+                    }
+                } catch (pollError) {
+                    if (pollError instanceof Error && pollError.message.includes('Requested entity was not found')) {
+                        setError('Your API key is invalid or has expired. Please select a new one.');
+                        setHasApiKey(false); // Force re-selection
+                        cleanupPolling();
+                        setIsLoading(false);
+                    } else {
+                        // Keep polling on other transient errors
+                        setLoadingMessage('A temporary issue occurred. Still trying...');
+                    }
+                }
+            }, 10000); // Poll every 10 seconds
+
+        } catch (err) {
+            setError(err instanceof Error ? err.message : 'Failed to start video generation.');
+            if (err instanceof Error && err.message.includes('Requested entity was not found')) {
+                setHasApiKey(false); // Force re-selection
+            }
+            setIsLoading(false);
+        }
+    }, [prompt, tool.id, onSaveAsProject]);
 
   const renderNextSteps = () => {
     if (!generatedContent) return null;
@@ -426,6 +561,10 @@ const ToolView: React.FC<ToolViewProps> = ({ tool, creationContext, setCreationC
         'chapter-generator': [{ label: 'Write Description', description: 'Finalize your description by adding these chapters.', toolId: 'description-generator', context: { transcript: transcript } }],
         'script-generator': [{ label: 'Generate Hooks', description: 'Create a powerful opening for your new script.', toolId: 'hooks-generator', context: { topic: prompt } }],
         'name-generator': [{ label: 'Brainstorm Video Ideas', description: 'Now you have a name, let\'s find some video ideas.', toolId: 'idea-generator', context: { topic: prompt } }],
+        'x-viral-post': [
+            { label: 'Generate Replies', description: 'Draft some potential replies for your new viral post.', toolId: 'x-post-reply', context: { topic: generatedContent as string } },
+            { label: 'Generate Another Post', description: 'Create another viral post on a different topic.', toolId: 'x-viral-post', context: { topic: '' } }
+        ],
     };
 
     const steps = toolNextSteps[tool.id] || [];
@@ -706,9 +845,82 @@ const ToolView: React.FC<ToolViewProps> = ({ tool, creationContext, setCreationC
             ))}
         </div>
     );
+    
+    const renderShortsTitleDescResponse = (content: ShortsTitleDescResponse) => {
+        const [isTitleCopied, copyTitle] = useCopyToClipboard();
+        const [isDescCopied, copyDesc] = useCopyToClipboard();
+
+        return (
+            <div className="mt-6 space-y-4">
+                <div>
+                    <div className="flex justify-between items-center mb-1">
+                        <h4 className="font-bold text-lg text-gray-800">Generated Title</h4>
+                        <button onClick={() => copyTitle(content.title)} className="text-sm font-semibold text-brand-red hover:text-red-700 flex items-center gap-1">
+                             {isTitleCopied ? <ClipboardCheckIcon className="w-4 h-4 text-green-600" /> : <ClipboardIcon className="w-4 h-4" />}
+                             {isTitleCopied ? 'Copied!' : 'Copy'}
+                        </button>
+                    </div>
+                    <p className="p-4 bg-white border border-gray-200 rounded-lg shadow-sm font-semibold">{content.title}</p>
+                </div>
+                <div>
+                    <div className="flex justify-between items-center mb-1">
+                        <h4 className="font-bold text-lg text-gray-800">Generated Description</h4>
+                        <button onClick={() => copyDesc(content.description)} className="text-sm font-semibold text-brand-red hover:text-red-700 flex items-center gap-1">
+                             {isDescCopied ? <ClipboardCheckIcon className="w-4 h-4 text-green-600" /> : <ClipboardIcon className="w-4 h-4" />}
+                             {isDescCopied ? 'Copied!' : 'Copy'}
+                        </button>
+                    </div>
+                    <p className="p-4 bg-white border border-gray-200 rounded-lg shadow-sm text-sm whitespace-pre-wrap">{content.description}</p>
+                </div>
+                 <div>
+                    <h4 className="font-bold text-lg text-gray-800 mb-2">Suggested Hashtags</h4>
+                    <div className="flex flex-wrap gap-2">
+                        {content.hashtags.map(tag => <code key={tag} className="text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded-full">{tag}</code>)}
+                    </div>
+                </div>
+            </div>
+        );
+    };
 
   const renderToolUI = () => {
     switch (tool.id) {
+      case 'x-video-downloader':
+        return (
+            <>
+                <label htmlFor="prompt" className="block text-sm font-medium text-gray-700 mb-2">X (Twitter) Post URL</label>
+                <div className="relative w-full">
+                    <WriteIcon className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400 peer-focus:text-brand-red transition-colors pointer-events-none" />
+                    <input
+                      id="prompt"
+                      type="url"
+                      value={prompt}
+                      onChange={(e) => { setPrompt(e.target.value) }}
+                      placeholder="e.g., https://x.com/username/status/12345..."
+                      className="peer w-full p-3 pl-12 bg-gray-50/70 border-2 border-transparent rounded-xl focus:ring-2 focus:ring-brand-red/70 focus:border-transparent focus:bg-white transition-all shadow-sm text-gray-900 placeholder:text-gray-500"
+                    />
+                </div>
+                {isLoading && <div className="text-center p-8 text-gray-500">Finding video...</div>}
+                {generatedContent && typeof generatedContent === 'string' && (
+                     <div className="mt-6 space-y-4">
+                        <video
+                            src={generatedContent}
+                            controls
+                            className="w-full max-w-md mx-auto rounded-lg shadow-lg bg-black"
+                        />
+                        <a
+                            href={generatedContent}
+                            download="x_video.mp4"
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="mt-4 w-full max-w-md mx-auto inline-flex items-center justify-center gap-2 bg-brand-red hover:bg-red-700 text-white font-semibold py-3 px-4 rounded-md transition-all text-sm shadow-md"
+                        >
+                            <DownloadIcon className="w-5 h-5" />
+                            Download Video
+                        </a>
+                     </div>
+                )}
+            </>
+        );
       case 'transcript-generator':
         return (
           <>
@@ -836,7 +1048,7 @@ const ToolView: React.FC<ToolViewProps> = ({ tool, creationContext, setCreationC
                    {originalImageUrl && imageFile ? (
                     <div className="relative group">
                       <img src={originalImageUrl} alt="Thumbnail preview" className="w-full h-auto rounded-lg shadow-md object-cover aspect-video" />
-                       <button onClick={clearImage} className="absolute top-2 right-2 bg-black/50 text-white rounded-full p-1.5 hover:bg-black/75 transition-opacity opacity-0 group-hover:opacity-100">
+                       <button onClick={clearFile} className="absolute top-2 right-2 bg-black/50 text-white rounded-full p-1.5 hover:bg-black/75 transition-opacity opacity-0 group-hover:opacity-100">
                          <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" /></svg>
                        </button>
                        <div className="absolute bottom-0 left-0 right-0 bg-black/60 text-white text-xs p-2 rounded-b-lg truncate">
@@ -856,7 +1068,7 @@ const ToolView: React.FC<ToolViewProps> = ({ tool, creationContext, setCreationC
                         <div className="flex text-sm text-gray-600">
                           <label htmlFor="image-upload" className="relative cursor-pointer bg-white rounded-md font-medium text-brand-red hover:text-red-700 focus-within:outline-none focus-within:ring-2 focus-within:ring-offset-2 focus-within:ring-brand-red">
                             <span>{isDraggingOver ? "Drop your image here" : "Upload a file"}</span>
-                            <input id="image-upload" name="image-upload" type="file" className="sr-only" accept="image/png, image/jpeg, image/gif" onChange={handleImageChange} />
+                            <input id="image-upload" name="image-upload" type="file" className="sr-only" accept="image/png, image/jpeg, image/gif" onChange={handleFileChange} />
                           </label>
                           {!isDraggingOver && <p className="pl-1">or drag and drop</p>}
                         </div>
@@ -923,6 +1135,88 @@ const ToolView: React.FC<ToolViewProps> = ({ tool, creationContext, setCreationC
                 {generatedContent && Array.isArray(generatedContent) && <FinancialThreadResponseView thread={generatedContent} />}
             </>
         );
+      case 'x-viral-post':
+          return (
+            <>
+                <label htmlFor="prompt" className="block text-sm font-medium text-gray-700 mb-2">Topic for your Viral Post</label>
+                <div className="relative w-full">
+                    <WriteIcon className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400 peer-focus:text-brand-red transition-colors pointer-events-none" />
+                    <input
+                      id="prompt"
+                      type="text"
+                      value={prompt}
+                      onChange={(e) => { setPrompt(e.target.value) }}
+                      placeholder="e.g., The future of AI in content creation"
+                      className="peer w-full p-3 pl-12 bg-gray-50/70 border-2 border-transparent rounded-xl focus:ring-2 focus:ring-brand-red/70 focus:border-transparent focus:bg-white transition-all shadow-sm text-gray-900 placeholder:text-gray-500"
+                    />
+                </div>
+                {isLoading && !generatedContent && <div className="text-center p-8 text-gray-500">Crafting your viral post...</div>}
+                {generatedContent && typeof generatedContent === 'string' &&
+                    <div className="mt-6">
+                        <TweetCard text={generatedContent} onCopy={() => {}} />
+                    </div>
+                }
+            </>
+        );
+      case 'x-post-reply':
+        const tones = ['Witty', 'Professional', 'Supportive', 'Controversial', 'Curious'];
+        const goals = ['Drive Engagement', 'Answer Question', 'Build Community', 'Add Value'];
+        return (
+            <div className="space-y-6">
+                 <div>
+                    <label htmlFor="prompt" className="block text-sm font-medium text-gray-700 mb-2">Original Post Content or URL</label>
+                    <div className="relative w-full">
+                        <WriteIcon className="absolute left-4 top-4 h-5 w-5 text-gray-400 peer-focus:text-brand-red transition-colors pointer-events-none" />
+                        <textarea id="prompt" value={prompt} onChange={(e) => { setPrompt(e.target.value); }} placeholder="Paste the content of the X post you want to reply to..." rows={4} className="peer w-full p-4 pl-12 bg-gray-50/70 border-2 border-transparent rounded-xl focus:ring-2 focus:ring-brand-red/70 focus:border-transparent focus:bg-white transition-all shadow-sm text-gray-900 placeholder:text-gray-500"/>
+                    </div>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div>
+                        <h4 className="text-sm font-medium text-gray-700 mb-2">Select a Tone</h4>
+                        <div className="flex flex-wrap gap-2">
+                            {tones.map(tone => (
+                                <button
+                                    key={tone}
+                                    type="button"
+                                    onClick={() => setReplyTone(tone)}
+                                    className={`px-3 py-1.5 text-sm font-semibold rounded-full border-2 transition-all ${replyTone === tone ? 'bg-brand-red text-white border-brand-red' : 'bg-white text-gray-700 border-gray-200 hover:border-gray-400'}`}
+                                >
+                                    {tone}
+                                </button>
+                            ))}
+                        </div>
+                    </div>
+                     <div>
+                        <h4 className="text-sm font-medium text-gray-700 mb-2">Select a Goal</h4>
+                        <div className="flex flex-wrap gap-2">
+                            {goals.map(goal => (
+                                <button
+                                    key={goal}
+                                    type="button"
+                                    onClick={() => setReplyGoal(goal)}
+                                    className={`px-3 py-1.5 text-sm font-semibold rounded-full border-2 transition-all ${replyGoal === goal ? 'bg-brand-red text-white border-brand-red' : 'bg-white text-gray-700 border-gray-200 hover:border-gray-400'}`}
+                                >
+                                    {goal}
+                                </button>
+                            ))}
+                        </div>
+                    </div>
+                </div>
+
+                {isLoading && !generatedContent && <div className="text-center p-8 text-gray-500">Generating replies...</div>}
+                {generatedContent && 'replies' in generatedContent && (
+                     <div className="mt-6 space-y-4">
+                        <h4 className="font-bold text-lg text-gray-800">Generated Replies</h4>
+                        <div className="space-y-3">
+                            {(generatedContent as XReplyGenerationResponse).replies.map((reply, index) => (
+                                <TweetCard key={index} text={reply} onCopy={() => {}} />
+                            ))}
+                        </div>
+                    </div>
+                )}
+            </div>
+        );
       case 'shorts-idea-generator':
         return (
             <>
@@ -982,7 +1276,7 @@ const ToolView: React.FC<ToolViewProps> = ({ tool, creationContext, setCreationC
                     {originalImageUrl && imageFile ? (
                         <div className="relative group">
                         <img src={originalImageUrl} alt="Reference thumbnail" className="w-full h-auto rounded-lg shadow-md object-cover aspect-video" />
-                        <button onClick={clearImage} className="absolute top-2 right-2 bg-black/50 text-white rounded-full p-1.5 hover:bg-black/75 transition-opacity opacity-0 group-hover:opacity-100">
+                        <button onClick={clearFile} className="absolute top-2 right-2 bg-black/50 text-white rounded-full p-1.5 hover:bg-black/75 transition-opacity opacity-0 group-hover:opacity-100">
                             <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" /></svg>
                         </button>
                         </div>
@@ -999,7 +1293,7 @@ const ToolView: React.FC<ToolViewProps> = ({ tool, creationContext, setCreationC
                             <div className="flex text-sm text-gray-600">
                             <label htmlFor="image-upload" className="relative cursor-pointer bg-white rounded-md font-medium text-brand-red hover:text-red-700 focus-within:outline-none">
                                 <span>{isDraggingOver ? "Drop to upload" : "Upload a competitor's thumbnail"}</span>
-                                <input id="image-upload" name="image-upload" type="file" className="sr-only" accept="image/png, image/jpeg" onChange={handleImageChange} />
+                                <input id="image-upload" name="image-upload" type="file" className="sr-only" accept="image/png, image/jpeg" onChange={handleFileChange} />
                             </label>
                              {!isDraggingOver && <p className="pl-1">or drag and drop</p>}
                             </div>
@@ -1091,31 +1385,124 @@ const ToolView: React.FC<ToolViewProps> = ({ tool, creationContext, setCreationC
             {generatedContent && typeof generatedContent === 'object' && 'metadata' in generatedContent && renderScriptGenerationResponse(generatedContent)}
           </>
         );
+      case 'shorts-video-generator':
+          if (isCheckingApiKey) return <div className="text-center p-8"><SpinnerIcon className="w-8 h-8 mx-auto text-brand-red animate-spin"/></div>
+          if (!hasApiKey) return (
+            <div className="text-center p-8 bg-gray-50 rounded-lg border-2 border-dashed">
+                <h4 className="font-bold text-lg">API Key Required</h4>
+                <p className="text-gray-600 my-2">The Veo video generation model requires you to select your own API key. This is a mandatory step.</p>
+                <p className="text-xs text-gray-500 mb-4">For more information on billing, please see the <a href="https://ai.google.dev/gemini-api/docs/billing" target="_blank" rel="noopener noreferrer" className="text-brand-red underline">official documentation</a>.</p>
+                <button onClick={async () => {
+                    await (window as any).aistudio.openSelectKey();
+                    // Assume success and re-render to show main UI
+                    setHasApiKey(true); 
+                }} className="bg-brand-red hover:bg-red-700 text-white font-bold py-2 px-6 rounded-lg transition-all">
+                    Select API Key
+                </button>
+            </div>
+          );
+          return (
+             <div className="space-y-6">
+                <div>
+                    <label htmlFor="prompt" className="block text-sm font-medium text-gray-700">Describe the short video you want to create</label>
+                    <div className="relative w-full mt-2">
+                      <WriteIcon className="absolute left-4 top-4 h-5 w-5 text-gray-400 peer-focus:text-brand-red transition-colors pointer-events-none" />
+                      <textarea id="prompt" value={prompt} onChange={(e) => setPrompt(e.target.value)} placeholder="e.g., A neon hologram of a cat driving a sports car at top speed through a futuristic city" rows={4} className="peer w-full p-4 pl-12 bg-gray-50/70 border-2 border-transparent rounded-xl focus:ring-2 focus:ring-brand-red/70 focus:border-transparent focus:bg-white transition-all shadow-sm text-gray-900 placeholder:text-gray-500"/>
+                    </div>
+                </div>
+                <div>
+                     <h4 className="font-semibold mb-2 text-center text-gray-600">Generated Video</h4>
+                     <div className="aspect-[9/16] bg-gray-900 rounded-lg flex items-center justify-center text-gray-400 overflow-hidden shadow-inner relative group">
+                        {isLoading ? (
+                            <div className="flex flex-col items-center gap-2 text-white p-4 text-center">
+                                <SpinnerIcon className="animate-spin h-6 w-6 text-brand-red" />
+                                <span>{loadingMessage}</span>
+                            </div>
+                        ) : generatedContent && typeof generatedContent === 'string' ? (
+                          <>
+                            <video src={generatedContent} controls autoPlay loop className="object-contain w-full h-full" />
+                            <a href={generatedContent} download="generated-short.mp4" aria-label="Download video" className="absolute top-2 right-2 bg-black/50 text-white rounded-full p-1.5 hover:bg-black/75 transition-opacity opacity-0 group-hover:opacity-100">
+                                <DownloadIcon className="h-5 w-5" />
+                            </a>
+                          </>
+                        ) : (
+                          <span>AI Result (9:16)</span>
+                        )}
+                     </div>
+                </div>
+            </div>
+          );
+      case 'shorts-title-desc-generator':
+        return (
+            <div className="space-y-6">
+              <div>
+                <label htmlFor="video-upload" className="block text-sm font-medium text-gray-700 mb-2">1. Upload your Short Video</label>
+                <div className="mt-1">
+                   {videoPreviewUrl && videoFile ? (
+                    <div className="relative group">
+                      <video src={videoPreviewUrl} controls className="w-full h-auto rounded-lg shadow-md object-cover aspect-video bg-black" />
+                       <button onClick={clearFile} className="absolute top-2 right-2 bg-black/50 text-white rounded-full p-1.5 hover:bg-black/75 transition-opacity opacity-0 group-hover:opacity-100">
+                         <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" /></svg>
+                       </button>
+                       <div className="absolute bottom-0 left-0 right-0 bg-black/60 text-white text-xs p-2 rounded-b-lg truncate">
+                        {videoFile.name}
+                      </div>
+                    </div>
+                  ) : (
+                    <div
+                        onDragEnter={handleDragEnter}
+                        onDragLeave={handleDragLeave}
+                        onDragOver={handleDragOver}
+                        onDrop={handleDrop}
+                        className={`flex justify-center px-6 pt-5 pb-6 border-2 border-dashed rounded-md transition-colors ${isDraggingOver ? 'border-brand-red bg-red-50' : 'border-gray-300'}`}
+                    >
+                      <div className="space-y-1 text-center">
+                         <svg xmlns="http://www.w3.org/2000/svg" className="mx-auto h-12 w-12 text-gray-400" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="m15.75 10.5 4.72-4.72a.75.75 0 0 1 1.28.53v11.38a.75.75 0 0 1-1.28.53l-4.72-4.72M4.5 18.75h9a2.25 2.25 0 0 0 2.25-2.25v-9A2.25 2.25 0 0 0 13.5 5.25h-9A2.25 2.25 0 0 0 2.25 7.5v9A2.25 2.25 0 0 0 4.5 18.75Z" /></svg>
+                        <div className="flex text-sm text-gray-600">
+                          <label htmlFor="video-upload" className="relative cursor-pointer bg-white rounded-md font-medium text-brand-red hover:text-red-700 focus-within:outline-none">
+                            <span>{isDraggingOver ? "Drop your video here" : "Upload a video file"}</span>
+                            <input id="video-upload" name="video-upload" type="file" className="sr-only" accept="video/*" onChange={handleFileChange} />
+                          </label>
+                          {!isDraggingOver && <p className="pl-1">or drag and drop</p>}
+                        </div>
+                        <p className="text-xs text-gray-500">MP4, MOV, etc. up to 50MB</p>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+              {isLoading && <div className="text-center p-8 text-gray-500">Analyzing video...</div>}
+              {generatedContent && typeof generatedContent === 'object' && 'title' in generatedContent && renderShortsTitleDescResponse(generatedContent)}
+            </div>
+        );
       default:
         return <p>This tool is coming soon!</p>;
     }
   };
   
   const submitButtonText = tool.id === 'copy-assistant' ? 'Generate Edit Plan' : 'Generate';
-  const showSubmitButton = tool.id !== 'copy-assistant' && tool.id !== 'thumbnail-downloader';
+  const showSubmitButton = !['copy-assistant', 'thumbnail-downloader', 'shorts-video-generator'].includes(tool.id);
+  const currentSubmitHandler = tool.id === 'copy-assistant' ? handleCopierPlanGeneration 
+      : tool.id === 'shorts-video-generator' ? handleVideoGenerationSubmit
+      : handleSubmit;
 
   return (
-    <form onSubmit={tool.id === 'copy-assistant' ? handleCopierPlanGeneration : handleSubmit} className="space-y-6">
+    <form onSubmit={currentSubmitHandler} className="space-y-6">
         <div>{renderToolUI()}</div>
         {error && <p className="text-red-500 mt-4 text-sm font-medium text-center">{error}</p>}
         
-        {showSubmitButton && (
+        { (showSubmitButton || tool.id === 'shorts-video-generator') && (
           <div className="pt-2 flex justify-end">
             <button type="submit" disabled={isLoading} className="bg-brand-red hover:bg-red-700 text-white font-bold py-3 px-8 rounded-lg transition-all duration-300 ease-in-out disabled:bg-red-300 disabled:cursor-not-allowed transform hover:scale-105 disabled:scale-100 flex items-center gap-2 shadow-md">
               {isLoading ? (
                   <>
                       <SpinnerIcon className="animate-spin -ml-1 mr-2 h-5 w-5 text-white" />
-                      {copierState.step === 'planning' ? 'Planning...' : 'Generating...'}
+                      {tool.id === 'shorts-video-generator' ? 'Generating...' : (copierState.step === 'planning' ? 'Planning...' : 'Generating...')}
                   </>
               ) : (
                   <>
                       <SparklesIcon className="h-5 w-5"/>
-                      {submitButtonText}
+                      {tool.id === 'shorts-video-generator' ? 'Generate Video' : submitButtonText}
                   </>
               )}
             </button>

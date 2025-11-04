@@ -152,3 +152,15 @@ export interface ShortsIdea {
 export interface ShortsGenerationResponse {
     ideas: ShortsIdea[];
 }
+
+// For Shorts Title & Desc Generator from Video
+export interface ShortsTitleDescResponse {
+    title: string;
+    description: string;
+    hashtags: string[];
+}
+
+// For X Post Reply Generator
+export interface XReplyGenerationResponse {
+    replies: string[];
+}

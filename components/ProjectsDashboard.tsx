@@ -1,5 +1,5 @@
 import React, { useState, useCallback } from 'react';
-import { Project, ProjectStatus, Tool, FeedbackComment } from '../types';
+import { Project, ProjectStatus, Tool, FeedbackComment, ShortsTitleDescResponse } from '../types';
 import { BriefcaseIcon, CheckCircleIcon, ChatBubbleLeftEllipsisIcon, PaperAirplaneIcon } from './Icons';
 import ToolView from './ToolView'; // Re-use the renderer from ToolView
 
@@ -59,6 +59,9 @@ const ProjectsDashboard: React.FC<ProjectsDashboardProps> = ({ projects, onUpdat
              if (content.startsWith('data:image')) {
                  return <img src={content} alt="Generated Thumbnail" className="rounded-lg shadow-md aspect-video object-cover" />;
              }
+             if (content.startsWith('blob:')) {
+                 return <video src={content} controls className="w-full rounded-lg shadow-md aspect-video" />;
+             }
              return <div className="whitespace-pre-wrap p-4 bg-gray-50 border rounded-md font-mono text-sm">{content}</div>;
          }
          if (Array.isArray(content)) {
@@ -68,6 +71,21 @@ const ProjectsDashboard: React.FC<ProjectsDashboardProps> = ({ projects, onUpdat
              return <ul className="space-y-2">{content.map((item, i) => <li key={i} className="p-3 bg-gray-50 border rounded-md">{item}</li>)}</ul>;
          }
          if (typeof content === 'object' && content !== null) {
+              if (project.toolId === 'shorts-title-desc-generator' && 'title' in content) {
+                const shortsContent = content as ShortsTitleDescResponse;
+                return (
+                    <div className="space-y-3">
+                        <div>
+                            <h6 className="font-semibold text-xs text-gray-500">Title</h6>
+                            <p className="p-2 bg-gray-50 border rounded-md">{shortsContent.title}</p>
+                        </div>
+                         <div>
+                            <h6 className="font-semibold text-xs text-gray-500">Description</h6>
+                            <p className="p-2 bg-gray-50 border rounded-md text-sm">{shortsContent.description}</p>
+                        </div>
+                    </div>
+                );
+              }
               return <pre className="whitespace-pre-wrap p-4 bg-gray-800 text-green-300 rounded-md font-mono text-xs max-h-96 overflow-y-auto">{JSON.stringify(content, null, 2)}</pre>;
          }
          return <p>Cannot render content of this type.</p>;
