@@ -478,10 +478,10 @@ const App: React.FC = () => {
         <div className="absolute top-4 right-4 z-50">
            <button 
                 onClick={toggleDarkMode} 
-                className="p-2 rounded-full bg-gray-200 dark:bg-gray-800 text-gray-800 dark:text-gray-200 transition-colors shadow-md hover:bg-gray-300 dark:hover:bg-gray-700"
+                className="p-2 rounded-full bg-gray-200 dark:bg-gray-800 text-gray-800 dark:text-gray-200 transition-colors shadow-md"
                 title="Toggle Dark Mode"
             >
-                {darkMode ? <SunIcon className="w-6 h-6" /> : <MoonIcon className="w-6 h-6" />}
+                {darkMode ? <SunIcon className="w-5 h-5" /> : <MoonIcon className="w-5 h-5" />}
             </button>
         </div>
         <ToolPage 
@@ -507,16 +507,16 @@ const App: React.FC = () => {
       <div className="absolute top-4 right-4 z-50">
            <button 
                 onClick={toggleDarkMode} 
-                className="p-2 rounded-full bg-white dark:bg-gray-800 text-gray-800 dark:text-gray-200 transition-colors shadow-md border border-gray-200 dark:border-gray-700 hover:bg-gray-100 dark:hover:bg-gray-700"
+                className="p-2 rounded-full bg-white dark:bg-gray-800 text-gray-800 dark:text-gray-200 transition-colors shadow-md border border-gray-200 dark:border-gray-700"
                 title="Toggle Dark Mode"
             >
-                {darkMode ? <SunIcon className="w-6 h-6" /> : <MoonIcon className="w-6 h-6" />}
+                {darkMode ? <SunIcon className="w-5 h-5" /> : <MoonIcon className="w-5 h-5" />}
             </button>
       </div>
       <main className="max-w-7xl mx-auto">
         <header className="text-center mb-12">
            <div className="inline-flex items-center gap-4 mb-4">
-            <LogoIcon className="h-14 w-14" />
+            <LogoIcon className="h-12 w-12" />
             <h1 className="text-4xl md:text-5xl font-bold text-gray-900 dark:text-white tracking-tight">Creator Studio AI</h1>
            </div>
            <p className="text-lg text-gray-500 dark:text-gray-400 max-w-3xl mx-auto">

@@ -507,7 +507,7 @@ Hard rules:
   - Text and major shapes must remain in the same bounding boxes (±5% tolerance in width/height/position).
   - Colors must match within a small delta (give hex + gradient stops).
   - Do not reinterpret layout, angles, 3D depth, or effects.
-  - Use masks and region-specific edits. Never regenerate the whole frame unless explicitly asked.
+- Use masks and region-specific edits. Never regenerate the whole frame unless explicitly asked.
 - Do not copy third-party logos/watermarks; mark them as {placeholder_logo}. Do not identify real people.
 - If any spec is uncertain, ask a clarifying question instead of guessing.
 
@@ -643,7 +643,7 @@ export interface WorkflowProgressUpdate {
 
 export const fetchTrendingTopics = async (): Promise<string[]> => {
     const response = await ai.models.generateContent({
-        model: 'gemini-2.5-flash', // Kept as flash for tools/search
+        model: 'gemini-2.5-flash', // Kept as flash for tools
         contents: `Find 5 current trending topics or news headlines that would make for engaging YouTube videos. Use Google Search for up-to-date information. Return the result as a JSON array of strings inside a \`\`\`json block. Do not include any other text or preamble.`,
         config: {
             tools: [{ googleSearch: {} }],
@@ -759,9 +759,9 @@ Example: \`\`\`json
 Do not include any other text, preamble, or markdown formatting around the JSON block.
 `;
     
-    // Using flash-lite as requested to minimize rate limits, assuming basic tool support
+    // Using flash for tool usage
     const response = await ai.models.generateContent({
-        model: 'gemini-flash-lite-latest', 
+        model: 'gemini-2.5-flash',
         contents: systemPrompt,
         config: {
             tools: [{ googleSearch: {} }],
@@ -800,7 +800,7 @@ The user has provided this X post URL: "${tweetUrl}"
     `;
 
     const response = await ai.models.generateContent({
-        model: 'gemini-2.5-flash', // Keep flash for reasoning + tools
+        model: 'gemini-2.5-pro', // Pro is better for multi-step reasoning like this
         contents: prompt,
         config: {
             tools: [{ googleSearch: {} }],
@@ -837,7 +837,7 @@ export const generateViralXPost = async (topic: string): Promise<string> => {
 
 export const generateXPostReply = async (originalPost: string, tone: string, goal: string): Promise<XReplyGenerationResponse> => {
     const response = await ai.models.generateContent({
-        model: 'gemini-flash-lite-latest',
+        model: 'gemini-2.5-pro',
         contents: `You are an AI assistant specializing in crafting strategic replies on X (Twitter).
         Your task is to generate 3 distinct reply options for the post below.
 
