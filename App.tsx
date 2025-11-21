@@ -20,6 +20,8 @@ import {
     XPostIcon,
     XReplyIcon,
     XVideoDownloadIcon,
+    MoonIcon,
+    SunIcon,
 } from './components/Icons';
 import * as geminiService from './services/geminiService';
 import Chatbot from './components/Chatbot';
@@ -276,11 +278,25 @@ const App: React.FC = () => {
     selectedTitle: '',
   });
 
+  // State for Dark Mode
+  const [darkMode, setDarkMode] = useState(false);
+
+  useEffect(() => {
+    if (darkMode) {
+      document.documentElement.classList.add('dark');
+    } else {
+      document.documentElement.classList.remove('dark');
+    }
+  }, [darkMode]);
+
+  const toggleDarkMode = () => setDarkMode(prev => !prev);
+
   // State for the AI Agent on the main page
   const [agentPrompt, setAgentPrompt] = useState('');
   const [isLoadingAgent, setIsLoadingAgent] = useState(false);
   const [agentError, setAgentError] = useState<string | null>(null);
   const [workflowSteps, setWorkflowSteps] = useState<WorkflowStep[] | null>(null);
+  const [selectedAgent, setSelectedAgent] = useState<'youtube' | 'x'>('youtube');
 
   // State for the Trending Topics feature
   const [trendingTopics, setTrendingTopics] = useState<string[] | null>(null);
@@ -328,7 +344,7 @@ const App: React.FC = () => {
 
   const runAutomation = useCallback(async (topic: string) => {
     if (!topic) {
-        setAgentError('Please enter a video topic to automate.');
+        setAgentError('Please enter a topic to automate.');
         return;
     }
     // Prevent re-running if already running on the same topic
@@ -339,13 +355,23 @@ const App: React.FC = () => {
     setAgentError(null);
     setWorkflowSteps(null);
 
-    const initialSteps: WorkflowStep[] = [
-        { id: 'titles', label: 'Generating Viral Titles', status: 'pending', content: null },
-        { id: 'hooks', label: 'Creating Catchy Hooks', status: 'pending', content: null },
-        { id: 'script', label: 'Writing Full Script', status: 'pending', content: null },
-        { id: 'description', label: 'Drafting Video Description', status: 'pending', content: null },
-        { id: 'tags', label: 'Optimizing SEO Tags', status: 'pending', content: null },
-    ];
+    let initialSteps: WorkflowStep[] = [];
+    if (selectedAgent === 'youtube') {
+        initialSteps = [
+            { id: 'titles', label: 'Generating Viral Titles', status: 'pending', content: null },
+            { id: 'hooks', label: 'Creating Catchy Hooks', status: 'pending', content: null },
+            { id: 'script', label: 'Writing Full Script', status: 'pending', content: null },
+            { id: 'description', label: 'Drafting Video Description', status: 'pending', content: null },
+            { id: 'tags', label: 'Optimizing SEO Tags', status: 'pending', content: null },
+        ];
+    } else {
+        initialSteps = [
+            { id: 'viral_post', label: 'Drafting Viral Post', status: 'pending', content: null },
+            { id: 'thread', label: 'Constructing X Thread', status: 'pending', content: null },
+            { id: 'hashtags', label: 'Selecting Hashtags', status: 'pending', content: null },
+        ];
+    }
+
     setWorkflowSteps(initialSteps);
 
     const onProgressCallback = (update: geminiService.WorkflowProgressUpdate) => {
@@ -360,14 +386,18 @@ const App: React.FC = () => {
     };
 
     try {
-      await geminiService.runFullWorkflow(topic, onProgressCallback);
+        if (selectedAgent === 'youtube') {
+            await geminiService.runFullWorkflow(topic, onProgressCallback);
+        } else {
+            await geminiService.runXWorkflow(topic, onProgressCallback);
+        }
     } catch (err) {
        setAgentError(err instanceof Error ? err.message : 'An unexpected error occurred during automation.');
        setWorkflowSteps(prev => prev?.map(s => s.status === 'running' || s.status === 'selecting' ? {...s, status: 'failed'} : s) || null);
     } finally {
       setIsLoadingAgent(false);
     }
-  }, [isLoadingAgent, agentPrompt]);
+  }, [isLoadingAgent, agentPrompt, selectedAgent]);
 
   const handleAgentSubmit = useCallback(async (e: React.FormEvent) => {
     e.preventDefault();
@@ -415,15 +445,15 @@ const App: React.FC = () => {
   }, [filteredTools]);
   
     const renderGeneratedText = (text: string) => (
-        <div className="whitespace-pre-wrap text-gray-700 bg-white p-4 rounded-lg border border-gray-200 font-mono text-sm shadow-sm">{text}</div>
+        <div className="whitespace-pre-wrap text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-800 p-4 rounded-lg border border-gray-200 dark:border-gray-700 font-mono text-sm shadow-sm">{text}</div>
     );
     
     const renderListContent = (content: ListContent) => (
         <ul className="list-none space-y-3">
             {content.alternatives.map((item, index) => (
-                <li key={index} className={`p-4 rounded-lg flex items-center gap-4 transition-all duration-300 ${item === content.chosen ? 'bg-green-100 border-green-300 shadow-md scale-105' : 'bg-white border-gray-200'}`}>
-                    {item === content.chosen && <CheckCircleIcon className="w-5 h-5 text-green-600 flex-shrink-0" />}
-                    <p className={`flex-grow ${item === content.chosen ? 'font-semibold text-green-900' : 'text-gray-700'}`}>{item}</p>
+                <li key={index} className={`p-4 rounded-lg flex items-center gap-4 transition-all duration-300 ${item === content.chosen ? 'bg-green-100 dark:bg-green-900/30 border-green-300 dark:border-green-700 shadow-md scale-105' : 'bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700'}`}>
+                    {item === content.chosen && <CheckCircleIcon className="w-5 h-5 text-green-600 dark:text-green-400 flex-shrink-0" />}
+                    <p className={`flex-grow ${item === content.chosen ? 'font-semibold text-green-900 dark:text-green-300' : 'text-gray-700 dark:text-gray-300'}`}>{item}</p>
                 </li>
             ))}
         </ul>
@@ -431,10 +461,10 @@ const App: React.FC = () => {
     
     const renderStepContent = (id: string, content: StepContent) => {
       if (typeof content === 'string') {
-          if (id.startsWith('select-')) return <div className="font-semibold text-gray-800 p-4 bg-gray-100 rounded-lg">Selected: <span className="font-mono text-indigo-700">{content}</span></div>;
+          if (id.startsWith('select-')) return <div className="font-semibold text-gray-800 dark:text-gray-200 p-4 bg-gray-100 dark:bg-gray-700 rounded-lg">Selected: <span className="font-mono text-indigo-700 dark:text-indigo-400">{content}</span></div>;
           return renderGeneratedText(content);
       }
-      if (Array.isArray(content)) return <ul className="list-none space-y-2">{content.map((c, i) => <li key={i} className="p-3 bg-white border border-gray-200 rounded-md shadow-sm">{c}</li>)}</ul>;
+      if (Array.isArray(content)) return <ul className="list-none space-y-2">{content.map((c, i) => <li key={i} className="p-3 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-md shadow-sm text-gray-700 dark:text-gray-300">{c}</li>)}</ul>;
       if (content && typeof content === 'object' && 'alternatives' in content) {
           return renderListContent(content as ListContent);
       }
@@ -444,49 +474,101 @@ const App: React.FC = () => {
 
   if (activeTool) {
     return (
-      <ToolPage 
-        tool={activeTool} 
-        onBack={handleGoBack} 
-        creationContext={creationContext}
-        setCreationContext={setCreationContext}
-        onNavigateToTool={(toolId, newContext) => {
-          const tool = tools.find(t => t.id === toolId);
-          if (tool) {
-            handleSelectTool(tool, newContext);
-          }
-        }}
-        onSaveAsProject={handleSaveAsProject}
-        tools={tools}
-      />
+      <div className="dark:bg-brand-dark-bg transition-colors duration-300">
+        <div className="absolute top-4 right-4 z-50">
+           <button 
+                onClick={toggleDarkMode} 
+                className="p-2 rounded-full bg-gray-200 dark:bg-gray-800 text-gray-800 dark:text-gray-200 transition-colors shadow-md hover:bg-gray-300 dark:hover:bg-gray-700"
+                title="Toggle Dark Mode"
+            >
+                {darkMode ? <SunIcon className="w-6 h-6" /> : <MoonIcon className="w-6 h-6" />}
+            </button>
+        </div>
+        <ToolPage 
+            tool={activeTool} 
+            onBack={handleGoBack} 
+            creationContext={creationContext}
+            setCreationContext={setCreationContext}
+            onNavigateToTool={(toolId, newContext) => {
+            const tool = tools.find(t => t.id === toolId);
+            if (tool) {
+                handleSelectTool(tool, newContext);
+            }
+            }}
+            onSaveAsProject={handleSaveAsProject}
+            tools={tools}
+        />
+      </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-brand-bg text-gray-800 font-sans p-4 sm:p-8">
+    <div className="min-h-screen bg-brand-bg dark:bg-brand-dark-bg text-gray-800 dark:text-gray-100 font-sans p-4 sm:p-8 transition-colors duration-300">
+      <div className="absolute top-4 right-4 z-50">
+           <button 
+                onClick={toggleDarkMode} 
+                className="p-2 rounded-full bg-white dark:bg-gray-800 text-gray-800 dark:text-gray-200 transition-colors shadow-md border border-gray-200 dark:border-gray-700 hover:bg-gray-100 dark:hover:bg-gray-700"
+                title="Toggle Dark Mode"
+            >
+                {darkMode ? <SunIcon className="w-6 h-6" /> : <MoonIcon className="w-6 h-6" />}
+            </button>
+      </div>
       <main className="max-w-7xl mx-auto">
         <header className="text-center mb-12">
            <div className="inline-flex items-center gap-4 mb-4">
-            <LogoIcon className="h-10 w-10" />
-            <h1 className="text-4xl md:text-5xl font-bold text-gray-900 tracking-tight">Creator Studio AI</h1>
+            <LogoIcon className="h-14 w-14" />
+            <h1 className="text-4xl md:text-5xl font-bold text-gray-900 dark:text-white tracking-tight">Creator Studio AI</h1>
            </div>
-           <p className="text-lg text-gray-500 max-w-3xl mx-auto">
+           <p className="text-lg text-gray-500 dark:text-gray-400 max-w-3xl mx-auto">
             Your complete YouTube automation suite, powered by Gemini. From viral ideas to SEO-optimized descriptions, we've got you covered.
            </p>
         </header>
         
-        <section className="max-w-4xl mx-auto mb-16 bg-white p-6 sm:p-8 rounded-2xl shadow-lg border border-gray-200">
+        <section className="max-w-4xl mx-auto mb-16 bg-white dark:bg-brand-dark-card p-6 sm:p-8 rounded-2xl shadow-lg border border-gray-200 dark:border-gray-700">
           <div className="text-center mb-6">
-              <h2 className="text-3xl font-bold text-gray-800 flex items-center justify-center gap-3">
-                  <RobotIcon className="w-8 h-8 text-brand-red" />
-                  <span>YouTube Automation Agent</span>
+              <div className="flex justify-center mb-6">
+                  <div className="bg-gray-100 dark:bg-gray-900 p-1 rounded-xl inline-flex shadow-inner">
+                      <button
+                          onClick={() => { setSelectedAgent('youtube'); setWorkflowSteps(null); }}
+                          className={`flex items-center gap-2 px-6 py-2.5 rounded-lg text-sm font-bold transition-all duration-200 ${
+                              selectedAgent === 'youtube'
+                                  ? 'bg-white dark:bg-gray-700 text-brand-red shadow-md scale-105'
+                                  : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 hover:bg-gray-200/50 dark:hover:bg-gray-800/50'
+                          }`}
+                      >
+                          <RobotIcon className={`w-5 h-5 ${selectedAgent === 'youtube' ? 'text-brand-red' : 'text-gray-400 dark:text-gray-500'}`} />
+                          YouTube Agent
+                      </button>
+                      <button
+                          onClick={() => { setSelectedAgent('x'); setWorkflowSteps(null); }}
+                          className={`flex items-center gap-2 px-6 py-2.5 rounded-lg text-sm font-bold transition-all duration-200 ${
+                              selectedAgent === 'x'
+                                  ? 'bg-white dark:bg-gray-700 text-black dark:text-white shadow-md scale-105'
+                                  : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 hover:bg-gray-200/50 dark:hover:bg-gray-800/50'
+                          }`}
+                      >
+                          <XIcon className={`w-4 h-4 ${selectedAgent === 'x' ? 'text-black dark:text-white' : 'text-gray-400 dark:text-gray-500'}`} />
+                          X Agent
+                          <span className="bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-300 text-[10px] px-1.5 py-0.5 rounded-full ml-1">BETA</span>
+                      </button>
+                  </div>
+              </div>
+
+              <h2 className="text-3xl font-bold text-gray-800 dark:text-white flex items-center justify-center gap-3">
+                  {selectedAgent === 'youtube' ? <RobotIcon className="w-8 h-8 text-brand-red" /> : <XIcon className="w-8 h-8 text-black dark:text-white" />}
+                  <span>{selectedAgent === 'youtube' ? 'YouTube Automation Agent' : 'X Automation Agent'}</span>
               </h2>
-              <p className="text-gray-500 mt-2">Enter a topic and let our agent handle the entire content creation workflow in one click.</p>
+              <p className="text-gray-500 dark:text-gray-400 mt-2">
+                {selectedAgent === 'youtube' 
+                    ? 'Enter a topic and let our agent handle the entire content creation workflow in one click.' 
+                    : 'Generate viral posts, threads, and hashtags for X in seconds.'}
+              </p>
           </div>
 
           <div className="space-y-4">
               <form onSubmit={handleAgentSubmit} className="space-y-4">
                   <div className="relative w-full">
-                    <WriteIcon className="absolute left-4 top-4 h-6 w-6 text-gray-400 peer-focus:text-brand-red transition-colors pointer-events-none" />
+                    <WriteIcon className="absolute left-4 top-4 h-6 w-6 text-gray-400 dark:text-gray-500 peer-focus:text-brand-red transition-colors pointer-events-none" />
                     <textarea 
                       id="agent-prompt" 
                       value={agentPrompt} 
@@ -495,13 +577,13 @@ const App: React.FC = () => {
                         setWorkflowSteps(null);
                         setAgentError(null);
                       }} 
-                      placeholder="e.g., A review of the new Gemini 2.5 Pro model" 
+                      placeholder={selectedAgent === 'youtube' ? "e.g., A review of the new Gemini 2.5 Pro model" : "e.g., The future of generative AI"} 
                       rows={3} 
-                      className="peer w-full p-4 pl-14 bg-gray-50/70 border-2 border-transparent rounded-xl focus:ring-2 focus:ring-brand-red/70 focus:border-transparent focus:bg-white transition-all shadow-sm text-gray-900 text-lg placeholder:text-gray-500"
+                      className="peer w-full p-4 pl-14 bg-gray-50/70 dark:bg-gray-800/50 border-2 border-transparent rounded-xl focus:ring-2 focus:ring-brand-red/70 focus:border-transparent focus:bg-white dark:focus:bg-gray-800 transition-all shadow-sm text-gray-900 dark:text-gray-100 text-lg placeholder:text-gray-500 dark:placeholder:text-gray-600"
                     />
                   </div>
                   <div className="grid grid-cols-1">
-                    <button type="submit" disabled={isLoadingAgent} className="w-full bg-brand-red hover:bg-red-700 text-white font-bold py-4 px-8 rounded-lg transition-all duration-300 ease-in-out disabled:bg-red-300 disabled:cursor-not-allowed transform hover:scale-105 disabled:scale-100 flex items-center justify-center gap-3 text-lg shadow-md">
+                    <button type="submit" disabled={isLoadingAgent} className="w-full bg-brand-red hover:bg-red-700 text-white font-bold py-4 px-8 rounded-lg transition-all duration-300 ease-in-out disabled:bg-red-300 dark:disabled:bg-red-900/50 disabled:cursor-not-allowed transform hover:scale-105 disabled:scale-100 flex items-center justify-center gap-3 text-lg shadow-md">
                         {isLoadingAgent ? (
                             <>
                                 <SpinnerIcon className="w-6 h-6 animate-spin"/>
@@ -510,24 +592,24 @@ const App: React.FC = () => {
                         ) : (
                             <>
                                 <SparklesIcon className="w-6 h-6"/>
-                                <span>Run Automation</span>
+                                <span>{selectedAgent === 'youtube' ? 'Run Automation' : 'Generate X Content'}</span>
                             </>
                         )}
                     </button>
                   </div>
               </form>
-              {agentError && <p className="text-red-600 mt-2 text-sm font-medium text-center">{agentError}</p>}
+              {agentError && <p className="text-red-600 dark:text-red-400 mt-2 text-sm font-medium text-center">{agentError}</p>}
           </div>
 
           <div className="mt-8">
-            <h3 className="text-lg font-bold text-gray-800 mb-4 flex items-center gap-2 justify-center">
-              <NewspaperIcon className="w-5 h-5 text-slate-600" />
+            <h3 className="text-lg font-bold text-gray-800 dark:text-gray-200 mb-4 flex items-center gap-2 justify-center">
+              <NewspaperIcon className="w-5 h-5 text-slate-600 dark:text-slate-400" />
               Trending Now
             </h3>
             {isFetchingTopics ? (
               <div className="text-center p-4"><SpinnerIcon className="w-8 h-8 mx-auto text-brand-red animate-spin"/></div>
             ) : trendingError ? (
-               <p className="text-red-600 text-sm font-medium text-center bg-red-50 p-3 rounded-lg">{trendingError}</p>
+               <p className="text-red-600 dark:text-red-400 text-sm font-medium text-center bg-red-50 dark:bg-red-900/20 p-3 rounded-lg">{trendingError}</p>
             ) : (
               <div className="flex flex-wrap gap-3 justify-center">
                 {trendingTopics?.map((topic, index) => (
@@ -535,7 +617,7 @@ const App: React.FC = () => {
                     key={index} 
                     onClick={() => handleTopicClick(topic)}
                     disabled={isLoadingAgent}
-                    className="px-3 py-1.5 text-sm bg-white text-slate-700 rounded-full font-semibold border border-slate-200 hover:bg-slate-100 hover:text-slate-900 transition-all duration-200 transform hover:scale-105 disabled:bg-slate-50 disabled:text-slate-400 disabled:cursor-not-allowed disabled:scale-100 shadow-sm"
+                    className="px-3 py-1.5 text-sm bg-white dark:bg-gray-800 text-slate-700 dark:text-slate-300 rounded-full font-semibold border border-slate-200 dark:border-slate-600 hover:bg-slate-100 dark:hover:bg-gray-700 hover:text-slate-900 dark:hover:text-white transition-all duration-200 transform hover:scale-105 disabled:bg-slate-50 dark:disabled:bg-gray-900 disabled:text-slate-400 disabled:cursor-not-allowed disabled:scale-100 shadow-sm"
                     title={topic}
                   >
                     {truncate(topic, 60)}
@@ -548,25 +630,25 @@ const App: React.FC = () => {
           {workflowSteps && (
               <div className="space-y-4 mt-8">
                   {workflowSteps.map(step => (
-                      <div key={step.id} className="p-4 bg-gray-50/80 rounded-xl border border-gray-200/80 transition-all backdrop-blur-sm">
+                      <div key={step.id} className="p-4 bg-gray-50/80 dark:bg-gray-800/60 rounded-xl border border-gray-200/80 dark:border-gray-700 transition-all backdrop-blur-sm">
                           <details open={step.status === 'completed' || step.status === 'running' || step.status === 'selecting'} className="group">
                               <summary className="flex items-center gap-3 cursor-pointer list-none">
                                   {step.status === 'running' && <SpinnerIcon className="w-5 h-5 text-blue-500 animate-spin" />}
                                   {step.status === 'selecting' && <TargetIcon className="w-5 h-5 text-indigo-500 animate-pulse" />}
                                   {step.status === 'completed' && <CheckCircleIcon className="w-5 h-5 text-green-500" />}
-                                  {step.status === 'pending' && <ClockIcon className="w-5 h-5 text-gray-400" />}
+                                  {step.status === 'pending' && <ClockIcon className="w-5 h-5 text-gray-400 dark:text-gray-500" />}
                                   {step.status === 'failed' && <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5 text-red-500" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" /></svg>}
-                                  <span className="font-semibold text-gray-700">{step.label}</span>
-                                  {step.status === 'running' && <span className="text-sm text-gray-500 ml-auto font-medium animate-pulse">Working...</span>}
-                                  {step.status === 'selecting' && <span className="text-sm text-indigo-600 ml-auto font-medium animate-pulse">Selecting Best...</span>}
-                                  {step.status === 'completed' && <span className="text-sm text-green-600 ml-auto font-medium">Done!</span>}
-                                  {step.status === 'failed' && <span className="text-sm text-red-600 ml-auto font-medium">Failed</span>}
+                                  <span className="font-semibold text-gray-700 dark:text-gray-200">{step.label}</span>
+                                  {step.status === 'running' && <span className="text-sm text-gray-500 dark:text-gray-400 ml-auto font-medium animate-pulse">Working...</span>}
+                                  {step.status === 'selecting' && <span className="text-sm text-indigo-600 dark:text-indigo-400 ml-auto font-medium animate-pulse">Selecting Best...</span>}
+                                  {step.status === 'completed' && <span className="text-sm text-green-600 dark:text-green-400 ml-auto font-medium">Done!</span>}
+                                  {step.status === 'failed' && <span className="text-sm text-red-600 dark:text-red-400 ml-auto font-medium">Failed</span>}
                                   <div className="ml-auto transform transition-transform duration-200 group-open:rotate-90">
-                                    <svg className="w-4 h-4 text-gray-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5l7 7-7 7" /></svg>
+                                    <svg className="w-4 h-4 text-gray-500 dark:text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5l7 7-7 7" /></svg>
                                   </div>
                               </summary>
                               {(step.status === 'completed' || step.status === 'selecting') && step.content && (
-                                  <div className="mt-4 pt-4 border-t border-gray-200">
+                                  <div className="mt-4 pt-4 border-t border-gray-200 dark:border-gray-700">
                                       {renderStepContent(step.id, step.content)}
                                   </div>
                               )}
@@ -580,19 +662,19 @@ const App: React.FC = () => {
         <ProjectsDashboard projects={projects} onUpdateProject={handleUpdateProject} tools={tools} />
 
         <div className="text-center mb-6 mt-16">
-            <h2 className="text-3xl font-bold text-gray-800">Or Use an Individual Tool</h2>
-            <p className="text-gray-500 mt-2">Fine-tune specific parts of your content with our specialized AI assistants.</p>
+            <h2 className="text-3xl font-bold text-gray-800 dark:text-white">Or Use an Individual Tool</h2>
+            <p className="text-gray-500 dark:text-gray-400 mt-2">Fine-tune specific parts of your content with our specialized AI assistants.</p>
         </div>
 
         <div className="mb-8 max-w-lg mx-auto">
           <div className="relative">
-            <SearchIcon className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400 peer-focus:text-brand-red pointer-events-none" />
+            <SearchIcon className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400 dark:text-gray-500 peer-focus:text-brand-red pointer-events-none" />
             <input 
               type="text"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               placeholder="Search for a tool (e.g., 'thumbnail', 'seo', 'script')..."
-              className="peer w-full p-3 pl-12 bg-white border-2 border-gray-200 rounded-full focus:ring-2 focus:ring-brand-red/70 focus:border-transparent transition-all shadow-sm text-gray-900 placeholder:text-gray-500"
+              className="peer w-full p-3 pl-12 bg-white dark:bg-brand-dark-card border-2 border-gray-200 dark:border-gray-700 rounded-full focus:ring-2 focus:ring-brand-red/70 focus:border-transparent transition-all shadow-sm text-gray-900 dark:text-white placeholder:text-gray-500 dark:placeholder:text-gray-400"
             />
           </div>
         </div>
@@ -606,7 +688,7 @@ const App: React.FC = () => {
                     }
                     return (
                         <section key={category}>
-                            <h3 className="text-2xl font-bold text-gray-800 mb-6 pb-2 border-b-2 border-gray-200">{category}</h3>
+                            <h3 className="text-2xl font-bold text-gray-800 dark:text-gray-100 mb-6 pb-2 border-b-2 border-gray-200 dark:border-gray-700">{category}</h3>
                             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                                 {toolsInCategory.map(tool => (
                                     <ToolCard 
@@ -622,8 +704,8 @@ const App: React.FC = () => {
                 })
             ) : (
                 <div className="text-center py-16">
-                    <p className="text-xl font-semibold text-gray-700">No tools found for "{searchQuery}"</p>
-                    <p className="text-gray-500 mt-2">Try searching for something else.</p>
+                    <p className="text-xl font-semibold text-gray-700 dark:text-gray-300">No tools found for "{searchQuery}"</p>
+                    <p className="text-gray-500 dark:text-gray-400 mt-2">Try searching for something else.</p>
                 </div>
             )}
         </div>

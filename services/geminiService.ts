@@ -27,9 +27,6 @@ const parseJsonFromText = <T,>(text: string): T | null => {
 
 // --- Transcript Generation ---
 export const getYouTubeTranscript = async (videoUrl: string): Promise<string> => {
-    // Note: A direct `fetch` to the tactiq.io API is blocked by browser CORS policy.
-    // Instead, we instruct Gemini (which runs on a server) to make the API call for us.
-    // This effectively uses the AI model as a server-side proxy to bypass the client-side CORS issue.
     const prompt = `
 You are an API calling agent. Your task is to fetch the transcript for the given YouTube video URL by making a POST request to 'https://tactiq-apps-prod.tactiq.io/transcript'.
 The request body must be a JSON object with this exact structure:
@@ -47,7 +44,7 @@ If the API call fails for any reason, or if the "captions" array is empty or doe
     `;
 
     const response = await ai.models.generateContent({
-        model: 'gemini-2.5-flash',
+        model: 'gemini-flash-lite-latest',
         contents: prompt,
     });
 
@@ -115,7 +112,7 @@ export const editImage = async (base64ImageData: string, mimeType: string, promp
 // --- Text Generation ---
 export const enhanceImageEditPrompt = async (prompt: string): Promise<string> => {
     const response = await ai.models.generateContent({
-        model: 'gemini-2.5-flash',
+        model: 'gemini-flash-lite-latest',
         contents: `A user wants to edit a YouTube thumbnail. Their instruction is: "${prompt}". 
         Enhance this instruction to be a more detailed and effective prompt for an AI image editor. 
         Focus on clarity, specific actions, and visual details. 
@@ -128,7 +125,7 @@ export const enhanceImageEditPrompt = async (prompt: string): Promise<string> =>
 
 export const enhanceImageGenerationPrompt = async (prompt: string): Promise<string> => {
     const response = await ai.models.generateContent({
-        model: 'gemini-2.5-flash',
+        model: 'gemini-flash-lite-latest',
         contents: `A user wants to generate an image for a YouTube thumbnail. Their prompt is: "${prompt}". 
         Enhance this prompt to be more descriptive and detailed for a powerful AI image generation model (like Imagen). 
         Add details about style (e.g., photorealistic, cartoon, watercolor), lighting (e.g., cinematic, soft), composition, and mood. 
@@ -182,7 +179,7 @@ Output as compact JSON only:
                                         .replace('{language}', 'en');
 
     const response = await ai.models.generateContent({
-        model: 'gemini-2.5-flash',
+        model: 'gemini-flash-lite-latest',
         contents: populatedPrompt,
         config: {
              responseMimeType: "application/json",
@@ -244,7 +241,7 @@ Output as JSON only:
         .replace('{language}', 'en');
 
     const response = await ai.models.generateContent({
-        model: transcript ? 'gemini-2.5-pro' : 'gemini-2.5-flash',
+        model: transcript ? 'gemini-2.5-pro' : 'gemini-flash-lite-latest',
         contents: populatedPrompt,
          config: {
              responseMimeType: "application/json",
@@ -260,7 +257,7 @@ Output as JSON only:
 
 export const generateHooks = async (topic: string): Promise<string[]> => {
     const response = await ai.models.generateContent({
-        model: 'gemini-2.5-flash',
+        model: 'gemini-flash-lite-latest',
         contents: `Generate 5 short, punchy, and engaging opening hooks (less than 15 words each) for a YouTube video about "${topic}". The hooks should grab the viewer's attention immediately. Return the result as a JSON array of strings inside a \`\`\`json block. Do not include any other text, preamble, or explanation.`,
         config: {
             responseMimeType: "application/json",
@@ -288,7 +285,7 @@ export const generateChapters = async (transcript: string): Promise<string> => {
 
 export const summarizeForTopic = async (transcript: string): Promise<string> => {
     const response = await ai.models.generateContent({
-        model: 'gemini-2.5-flash',
+        model: 'gemini-flash-lite-latest',
         contents: `Read the following transcript and summarize its main topic into a short, concise phrase suitable for a YouTube video topic. Return only the topic phrase itself.\n\nTranscript:\n${transcript}`,
     });
     return response.text.trim();
@@ -296,7 +293,7 @@ export const summarizeForTopic = async (transcript: string): Promise<string> => 
 
 export const generateContentIdeas = async (topic: string): Promise<string[]> => {
     const response = await ai.models.generateContent({
-        model: 'gemini-2.5-flash',
+        model: 'gemini-flash-lite-latest',
         contents: `Brainstorm 5 creative and engaging YouTube video ideas based on the topic: "${topic}". For each idea, provide a short, catchy title. Return the result as a JSON array of strings inside a \`\`\`json block. Do not include any other text, preamble, or explanation.`,
         config: {
             responseMimeType: "application/json",
@@ -316,7 +313,7 @@ export const generateContentIdeas = async (topic: string): Promise<string[]> => 
 
 export const generateShortsIdeas = async (topic: string): Promise<ShortsGenerationResponse> => {
     const response = await ai.models.generateContent({
-        model: 'gemini-2.5-flash',
+        model: 'gemini-flash-lite-latest',
         contents: `Brainstorm 3-5 distinct, viral YouTube Shorts ideas based on the topic: "${topic}".
         For each idea, provide a catchy title, 2-3 short hooks to grab attention, and a brief 1-2 sentence description or outline of the short.
         The goal is high engagement and watch time.
@@ -359,7 +356,7 @@ export const generateShortsIdeas = async (topic: string): Promise<ShortsGenerati
 
 export const generateTags = async (topic: string): Promise<string[]> => {
     const response = await ai.models.generateContent({
-        model: 'gemini-2.5-flash',
+        model: 'gemini-flash-lite-latest',
         contents: `Generate a list of 10-15 relevant and SEO-optimized YouTube tags for a video about "${topic}". Include a mix of broad and specific tags. Return the result as a single JSON array of strings inside a \`\`\`json block. Do not include any other text, preamble, or explanation.`,
         config: {
             responseMimeType: "application/json",
@@ -378,7 +375,7 @@ export const generateTags = async (topic: string): Promise<string[]> => {
 
 export const generateChannelNames = async (topic: string): Promise<string[]> => {
     const response = await ai.models.generateContent({
-        model: 'gemini-2.5-flash',
+        model: 'gemini-flash-lite-latest',
         contents: `Brainstorm 10 unique, catchy, and available-sounding YouTube channel names related to the topic: "${topic}". Return the result as a JSON array of strings inside a \`\`\`json block. Do not include any other text, preamble, or explanation.`,
         config: {
             responseMimeType: "application/json",
@@ -510,7 +507,7 @@ Hard rules:
   - Text and major shapes must remain in the same bounding boxes (±5% tolerance in width/height/position).
   - Colors must match within a small delta (give hex + gradient stops).
   - Do not reinterpret layout, angles, 3D depth, or effects.
-- Use masks and region-specific edits. Never regenerate the whole frame unless explicitly asked.
+  - Use masks and region-specific edits. Never regenerate the whole frame unless explicitly asked.
 - Do not copy third-party logos/watermarks; mark them as {placeholder_logo}. Do not identify real people.
 - If any spec is uncertain, ask a clarifying question instead of guessing.
 
@@ -646,7 +643,7 @@ export interface WorkflowProgressUpdate {
 
 export const fetchTrendingTopics = async (): Promise<string[]> => {
     const response = await ai.models.generateContent({
-        model: 'gemini-2.5-flash',
+        model: 'gemini-2.5-flash', // Kept as flash for tools/search
         contents: `Find 5 current trending topics or news headlines that would make for engaging YouTube videos. Use Google Search for up-to-date information. Return the result as a JSON array of strings inside a \`\`\`json block. Do not include any other text or preamble.`,
         config: {
             tools: [{ googleSearch: {} }],
@@ -664,7 +661,7 @@ const selectBestOption = async (options: string[], purpose: string): Promise<str
     if (options.length === 1) return options[0];
 
     const response = await ai.models.generateContent({
-        model: 'gemini-2.5-flash',
+        model: 'gemini-flash-lite-latest',
         contents: `From the following list, select the single best option for the purpose of "${purpose}". Return ONLY the selected option as a string, with no explanation or preamble.\n\nOptions:\n- ${options.join('\n- ')}`,
     });
     
@@ -762,10 +759,9 @@ Example: \`\`\`json
 Do not include any other text, preamble, or markdown formatting around the JSON block.
 `;
     
-    // As per Gemini docs, tools (like googleSearch) cannot be used with responseMimeType: "application/json".
-    // Therefore, we instruct the model to return JSON in a markdown block and parse it manually.
+    // Using flash-lite as requested to minimize rate limits, assuming basic tool support
     const response = await ai.models.generateContent({
-        model: 'gemini-2.5-pro',
+        model: 'gemini-flash-lite-latest', 
         contents: systemPrompt,
         config: {
             tools: [{ googleSearch: {} }],
@@ -804,7 +800,7 @@ The user has provided this X post URL: "${tweetUrl}"
     `;
 
     const response = await ai.models.generateContent({
-        model: 'gemini-2.5-pro', // Pro is better for multi-step reasoning like this
+        model: 'gemini-2.5-flash', // Keep flash for reasoning + tools
         contents: prompt,
         config: {
             tools: [{ googleSearch: {} }],
@@ -823,7 +819,7 @@ The user has provided this X post URL: "${tweetUrl}"
 
 export const generateViralXPost = async (topic: string): Promise<string> => {
     const response = await ai.models.generateContent({
-        model: 'gemini-2.5-flash',
+        model: 'gemini-flash-lite-latest',
         contents: `You are an expert X (Twitter) copywriter known for creating viral posts.
         Your goal is to write a single, highly engaging post based on the following topic: "${topic}".
 
@@ -841,7 +837,7 @@ export const generateViralXPost = async (topic: string): Promise<string> => {
 
 export const generateXPostReply = async (originalPost: string, tone: string, goal: string): Promise<XReplyGenerationResponse> => {
     const response = await ai.models.generateContent({
-        model: 'gemini-2.5-pro',
+        model: 'gemini-flash-lite-latest',
         contents: `You are an AI assistant specializing in crafting strategic replies on X (Twitter).
         Your task is to generate 3 distinct reply options for the post below.
 
@@ -886,7 +882,7 @@ export const generateXPostReply = async (originalPost: string, tone: string, goa
 
 // --- New Shorts Tools ---
 
-export const generateShortsTitleAndDescFromVideo = async (base64VideoData: string, mimeType: string): Promise<ShortsTitleDescResponse> => {
+export const generateShortsTitleDescFromVideo = async (base64VideoData: string, mimeType: string): Promise<ShortsTitleDescResponse> => {
     const prompt = `You are a YouTube Shorts expert specializing in viral content. Analyze the provided short video and generate a viral title, a short SEO-friendly description, and 5 relevant hashtags.
 
     **Rules:**
@@ -897,7 +893,7 @@ export const generateShortsTitleAndDescFromVideo = async (base64VideoData: strin
     Return the response as a single JSON object with the keys "title", "description", and "hashtags" (an array of strings). Do not include any other text or markdown formatting.`;
 
     const response = await ai.models.generateContent({
-        model: 'gemini-2.5-pro',
+        model: 'gemini-2.5-flash', // Use Flash for multimodal efficiency
         contents: {
             parts: [
                 {
@@ -952,4 +948,70 @@ export const checkVideoGenerationStatus = async (operation: any) => {
     const localAi = new GoogleGenAI({ apiKey: process.env.API_KEY });
     let updatedOperation = await localAi.operations.getVideosOperation({ operation: operation });
     return updatedOperation;
+};
+
+// --- New Generic X Tools for Automation Agent ---
+
+export const generateGenericThread = async (topic: string): Promise<string[]> => {
+    const response = await ai.models.generateContent({
+        model: 'gemini-flash-lite-latest',
+        contents: `Generate a 5-tweet Twitter thread about "${topic}". 
+        Make it engaging, informative, and formatted for X. 
+        Each tweet should be concise (under 280 chars).
+        Return the result as a JSON array of strings (one string per tweet) inside a \`\`\`json block.`,
+        config: {
+            responseMimeType: "application/json",
+            responseSchema: {
+                type: Type.ARRAY,
+                items: { type: Type.STRING }
+            }
+        },
+    });
+    const thread = parseJsonFromText<string[]>(response.text);
+    if (!thread || !Array.isArray(thread)) throw new Error("Failed to generate thread");
+    return thread;
+};
+
+export const generateXHashtags = async (topic: string): Promise<string[]> => {
+    const response = await ai.models.generateContent({
+        model: 'gemini-flash-lite-latest',
+        contents: `Generate 10 popular and relevant hashtags for an X (Twitter) post about "${topic}". Return as a JSON array of strings inside a \`\`\`json block.`,
+        config: {
+            responseMimeType: "application/json",
+            responseSchema: {
+                type: Type.ARRAY,
+                items: { type: Type.STRING }
+            }
+        },
+    });
+    const tags = parseJsonFromText<string[]>(response.text);
+    if (!tags || !Array.isArray(tags)) throw new Error("Failed to generate hashtags");
+    return tags;
+};
+
+export const runXWorkflow = async (
+    topic: string, 
+    onProgress: (update: WorkflowProgressUpdate) => void
+): Promise<void> => {
+    const runStep = async <T>(stepId: string, fn: () => Promise<T>): Promise<T> => {
+        try {
+            onProgress({ stepId, status: 'running' });
+            const result = await fn();
+            // X workflow doesn't have "selection" steps like YouTube, so we just complete
+            onProgress({ stepId, status: 'completed', data: result as StepContent });
+            return result;
+        } catch (error) {
+            console.error(`Error in workflow step ${stepId}:`, error);
+            onProgress({ stepId, status: 'failed' });
+            throw error; 
+        }
+    };
+    
+    try {
+        await runStep('viral_post', () => generateViralXPost(topic));
+        await runStep('thread', () => generateGenericThread(topic));
+        await runStep('hashtags', () => generateXHashtags(topic));
+    } catch (error) {
+        console.error("X Automation workflow failed.");
+    }
 };
